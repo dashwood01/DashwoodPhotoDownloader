@@ -13,7 +13,7 @@
 ```
 
 ```gradle
-    	        implementation 'com.github.dashwood01:DashwoodPhotoDownloader:0.2'
+    	        implementation 'com.github.dashwood01:DashwoodPhotoDownloader:0.3'
 ```
 
 ### Use it like this
@@ -34,3 +34,5 @@ clearCache | If you want every time delete image call this function
 setQuality | Quality of photo
 setWidthAndHeight | Width and Height of image
 setFilePath | You can save custom path you want
+setCallBackDownloader | CallBackDownloader listener
+setTimeForDeleteImage | You can use this function for delete files from now after minutes you want, If you don't set this item as default delete every hour
