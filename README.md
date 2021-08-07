@@ -13,7 +13,7 @@
 ```
 
 ```gradle
-    implementation 'com.github.dashwood01:HandlerError:0.2'
+    	        implementation 'com.github.dashwood01:DashwoodPhotoDownloader:0.2'
 ```
 
 ### Use it like this
@@ -30,7 +30,7 @@ Options | What work
 ------------ | -------------
 setImageLoading | Loading image show when image in downloading
 setUnloadedImage | If image not download show this
-clearCache | If you want every time delete image call this function 
+clearCache | If you want every time delete image call this function
 setQuality | Quality of photo
 setWidthAndHeight | Width and Height of image
 setFilePath | You can save custom path you want
