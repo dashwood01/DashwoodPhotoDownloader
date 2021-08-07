@@ -17,8 +17,11 @@ import androidx.core.content.ContextCompat;
 import com.android.volley.NetworkResponse;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
+import com.dashwood.photodownloader.data.Data;
 import com.dashwood.photodownloader.extra.Values;
+import com.dashwood.photodownloader.handler.HandlerCheckValue;
 import com.dashwood.photodownloader.handler.HandlerReturnValue;
+import com.dashwood.photodownloader.listener.CallBackDownloader;
 import com.dashwood.photodownloader.service.DownloadHttpService;
 import com.dashwood.photodownloader.service.HttpsTrustManager;
 
@@ -36,8 +39,13 @@ public class PhotoDownloader {
     private boolean clearCache;
     private int quality = 0;
     private int width = 0, height = 0;
+    private int timeAsMin = TIME_CLEAR_IMAGE_DEFAULT;
+    public static final int TIME_CLEAR_IMAGE_DEFAULT = -1;
+    public static final int TIME_OF_CLEAR_IMAGE_INFINITE = -2;
     private File filePath = null;
     private Animation animation;
+    private CallBackDownloader callBackDownloader;
+    private String saveDate;
 
     /**
      * You must set all this items, be careful all of this items can't be null
@@ -50,6 +58,14 @@ public class PhotoDownloader {
         this.context = context;
         this.url = url;
         this.imageView = imageView;
+        this.saveDate = Data.readPreferencesString(context,
+                context.getString(R.string.PREFERENCE_HOME_DATE), "", context.getString(R.string.PREFERENCE_KEY_DATE));
+        if (HandlerCheckValue.checkEmptyOrNullValue(saveDate)) {
+            saveDate = HandlerReturnValue.getNowDate();
+            Data.saveToPreferenceString(context, context.getString(R.string.PREFERENCE_HOME_DATE),
+                    saveDate, context.getString(R.string.PREFERENCE_KEY_DATE));
+        }
+
         if (requestQueue == null) {
             HttpsTrustManager.allowAllSSL();
             requestQueue = Volley.newRequestQueue(context);
@@ -115,6 +131,22 @@ public class PhotoDownloader {
         return this;
     }
 
+    public PhotoDownloader setCallBackDownloader(CallBackDownloader callBackDownloader) {
+        this.callBackDownloader = callBackDownloader;
+        return this;
+    }
+
+    /**
+     * This function help you for delete files
+     *
+     * @param timeAsMin you can set TIME_CLEAR_IMAGE_DEFAULT mean delete files every hour or TIME_OF_CLEAR_IMAGE_INFINITE never delete files
+     * @return
+     */
+    public PhotoDownloader setTimeForDeleteImage(int timeAsMin) {
+        this.timeAsMin = timeAsMin;
+        return this;
+    }
+
     public void init() {
         downloadPhoto();
     }
@@ -130,10 +162,13 @@ public class PhotoDownloader {
             file = new File(context.getExternalCacheDir() + "/" + Values.getImageDir());
         }
         if (file.mkdirs()) {
-            Log.i("LOG", "Directory created");
+            Log.i("LOG_DashWood", "Directory created");
         }
         String fileName = HandlerReturnValue.getFileName(url);
         File imgFile = new File(file.getAbsolutePath() + "/" + fileName);
+        if (timeAsMin == TIME_CLEAR_IMAGE_DEFAULT) {
+            timeAsMin = 60;
+        }
         if (loadingImage == null) {
             loadingImage = ContextCompat.getDrawable(context, R.drawable.ic_loading_photo_downloader);
             setAnimation();
@@ -145,19 +180,27 @@ public class PhotoDownloader {
         if (imgFile.exists()) {
             if (clearCache) {
                 if (imgFile.delete()) {
-                    Log.i("LOG", "clear image from storage");
+                    Log.i("LOG_DashWood", "clear image from storage");
                 }
-            } else {
-                imageView.clearAnimation();
-                Bitmap photoBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-                if (quality != 0) {
-                    setImageQuality(imgFile, photoBitmap);
-                }
-                if (width != 0 && height != 0) {
-                    photoBitmap = HandlerReturnValue.getResizedBitmap(photoBitmap, width, height);
-                }
-                imageView.setImageBitmap(photoBitmap);
+            } else if (timeAsMin == TIME_OF_CLEAR_IMAGE_INFINITE) {
+                showImage(imgFile);
                 return;
+            } else {
+                if (HandlerReturnValue.checkTimeForClear(saveDate, timeAsMin)) {
+                    if (HandlerReturnValue.removeDirectory(file)) {
+                        Log.i("LOG_DashWood", "clear directory from storage");
+                        Data.saveToPreferenceString(context, context.getString(R.string.PREFERENCE_HOME_DATE),
+                                "", context.getString(R.string.PREFERENCE_KEY_DATE));
+                        if (file.mkdirs()) {
+                            Log.i("LOG_DashWood", "Directory created");
+                        }
+                    } else {
+                        Log.i("LOG_DashWood", "FILE NOT DELETE");
+                    }
+                } else {
+                    showImage(imgFile);
+                    return;
+                }
             }
         }
         DownloadHttpService downloadHttpService = new DownloadHttpService(url,
@@ -171,15 +214,18 @@ public class PhotoDownloader {
                                 if (animation != null) {
                                     imageView.clearAnimation();
                                 }
-                                Bitmap photoBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-                                checkQuality(imgFile, photoBitmap);
-                                photoBitmap = getResizeBitmap(photoBitmap);
-                                imageView.setImageBitmap(photoBitmap);
+                                showImage(imgFile);
                             });
+                            if (callBackDownloader != null) {
+                                callBackDownloader.onSuccess(response);
+                            }
                         } else {
                             setImageUnloaded();
                         }
                     } catch (Exception e) {
+                        if (callBackDownloader != null) {
+                            callBackDownloader.onError(e);
+                        }
                         e.printStackTrace();
                         setImageUnloaded();
                     }
@@ -187,10 +233,13 @@ public class PhotoDownloader {
             setImageUnloaded();
             NetworkResponse networkResponse = error.networkResponse;
             if (networkResponse == null) {
-                Log.e("Error", "your error not in system, network response is Null");
+                Log.e("Error_DashWood", "your error not in system, network response is Null");
                 return;
             }
-            Log.e("Error", new String(networkResponse.data));
+            if (callBackDownloader != null) {
+                callBackDownloader.onError(new Exception(new String(networkResponse.data)));
+            }
+            Log.e("Error_DashWood", new String(networkResponse.data));
         });
         requestQueue.add(downloadHttpService);
     }
@@ -199,13 +248,6 @@ public class PhotoDownloader {
         if (quality != 0) {
             setImageQuality(file, bitmap);
         }
-    }
-
-    private Bitmap getResizeBitmap(Bitmap bitmap) {
-        if (width != 0 && height != 0) {
-            return HandlerReturnValue.getResizedBitmap(bitmap, width, height);
-        }
-        return bitmap;
     }
 
     private void setImageUnloaded() {
@@ -236,5 +278,17 @@ public class PhotoDownloader {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void showImage(File file) {
+        imageView.clearAnimation();
+        Bitmap photoBitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+        if (quality != 0) {
+            setImageQuality(file, photoBitmap);
+        }
+        if (width != 0 && height != 0) {
+            photoBitmap = HandlerReturnValue.getResizedBitmap(photoBitmap, width, height);
+        }
+        imageView.setImageBitmap(photoBitmap);
     }
 }
