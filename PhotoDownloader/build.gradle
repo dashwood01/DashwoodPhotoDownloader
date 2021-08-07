@@ -1,7 +1,20 @@
 plugins {
     id 'com.android.library'
+    id 'maven-publish'
 }
-
+group = 'com.github.dashwood01'
+afterEvaluate {
+    publishing {
+        publications {
+            mavenAar(MavenPublication) {
+                afterEvaluate {
+                    artifactId "$project.name"
+                    from components.release
+                }
+            }
+        }
+    }
+}
 android {
     compileSdk 30
 
