@@ -3,7 +3,6 @@ package com.dashwood.photodownloader;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.util.Log;
@@ -11,6 +10,8 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.android.volley.NetworkResponse;
@@ -29,14 +30,23 @@ public class PhotoDownloader {
     private RequestQueue requestQueue;
     private final Handler handler = new Handler();
     private final Context context;
-    private Drawable imageUnloaded;
+    private Drawable imageUnloaded, loadingImage;
     private String url;
     private ImageView imageView;
     private boolean clearCache;
     private int quality = 0;
     private int width = 0, height = 0;
+    private File filePath = null;
+    private Animation animation;
 
-    public PhotoDownloader(Context context, String url, ImageView imageView) {
+    /**
+     * You must set all this items, be careful all of this items can't be null
+     *
+     * @param context
+     * @param url
+     * @param imageView
+     */
+    public PhotoDownloader(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView) {
         this.context = context;
         this.url = url;
         this.imageView = imageView;
@@ -46,18 +56,30 @@ public class PhotoDownloader {
         }
     }
 
-    public PhotoDownloader setImageLoading(Drawable loadingImage, boolean isAnimationRotate) {
-        imageView.setImageDrawable(loadingImage);
-        if (isAnimationRotate) {
-            setAnimationStart();
-        }
+    public PhotoDownloader setImageLoading(Drawable loadingImage, Animation animation) {
+        this.loadingImage = loadingImage;
+        this.animation = animation;
+        return this;
+    }
+
+    public PhotoDownloader setImageLoading(int loadingImage, Animation animation) {
+        this.loadingImage = ContextCompat.getDrawable(context, loadingImage);
+        this.animation = animation;
         return this;
     }
 
     public PhotoDownloader setImageLoading(int loadingImage, boolean isAnimationRotate) {
-        imageView.setImageDrawable(ContextCompat.getDrawable(context, loadingImage));
+        this.loadingImage = ContextCompat.getDrawable(context, loadingImage);
         if (isAnimationRotate) {
-            setAnimationStart();
+            setAnimation();
+        }
+        return this;
+    }
+
+    public PhotoDownloader setImageLoading(Drawable loadingImage, boolean isAnimationRotate) {
+        this.loadingImage = loadingImage;
+        if (isAnimationRotate) {
+            setAnimation();
         }
         return this;
     }
@@ -72,8 +94,8 @@ public class PhotoDownloader {
         return this;
     }
 
-    public PhotoDownloader setClearCache(boolean clearCache) {
-        this.clearCache = clearCache;
+    public PhotoDownloader clearCache() {
+        this.clearCache = true;
         return this;
     }
 
@@ -88,46 +110,38 @@ public class PhotoDownloader {
         return this;
     }
 
-    public PhotoDownloader init() {
-        downloadPhoto();
+    public PhotoDownloader setFilePath(File filePath) {
+        this.filePath = filePath;
         return this;
     }
 
-    private void setAnimationStart() {
-        Animation animation = AnimationUtils.loadAnimation(context, R.anim.rotate_animaiton_infinite);
-        imageView.startAnimation(animation);
+    public void init() {
+        downloadPhoto();
     }
 
-    private void setImageQuality(File file, Bitmap bitmap) {
-        try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, fileOutputStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public Bitmap getResizedBitmap(Bitmap bm) {
-        int width = bm.getWidth();
-        int height = bm.getHeight();
-        float scaleWidth = ((float) this.width) / width;
-        float scaleHeight = ((float) this.height) / height;
-        Matrix matrix = new Matrix();
-        matrix.postScale(scaleWidth, scaleHeight);
-        Bitmap resizedBitmap = Bitmap.createBitmap(
-                bm, 0, 0, width, height, matrix, false);
-        bm.recycle();
-        return resizedBitmap;
-    }
 
     private void downloadPhoto() {
         String[] urls = url.split("/");
         if (urls[urls.length - 1].equals("null")) {
             return;
         }
-        File file = context.getExternalFilesDir(Values.getImageDir());
-        file.mkdirs();
+        File file = filePath;
+        if (filePath == null) {
+            file = new File(context.getExternalCacheDir() + "/" + Values.getImageDir());
+        }
+        if (file.mkdirs()) {
+            Log.i("LOG", "Directory created");
+        }
         String fileName = HandlerReturnValue.getFileName(url);
         File imgFile = new File(file.getAbsolutePath() + "/" + fileName);
+        if (loadingImage == null) {
+            loadingImage = ContextCompat.getDrawable(context, R.drawable.ic_loading_photo_downloader);
+            setAnimation();
+        }
+        imageView.setImageDrawable(loadingImage);
+        if (animation != null) {
+            imageView.startAnimation(animation);
+        }
         if (imgFile.exists()) {
             if (clearCache) {
                 if (imgFile.delete()) {
@@ -135,14 +149,14 @@ public class PhotoDownloader {
                 }
             } else {
                 imageView.clearAnimation();
-                Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
+                Bitmap photoBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
                 if (quality != 0) {
-                    setImageQuality(imgFile, myBitmap);
+                    setImageQuality(imgFile, photoBitmap);
                 }
                 if (width != 0 && height != 0) {
-                    myBitmap = getResizedBitmap(myBitmap);
+                    photoBitmap = HandlerReturnValue.getResizedBitmap(photoBitmap, width, height);
                 }
-                imageView.setImageBitmap(myBitmap);
+                imageView.setImageBitmap(photoBitmap);
                 return;
             }
         }
@@ -154,15 +168,13 @@ public class PhotoDownloader {
                             fileStream.write(response);
                             fileStream.close();
                             handler.post(() -> {
-                                imageView.clearAnimation();
-                                Bitmap myBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-                                if (quality != 0) {
-                                    setImageQuality(imgFile, myBitmap);
+                                if (animation != null) {
+                                    imageView.clearAnimation();
                                 }
-                                if (width != 0 && height != 0) {
-                                    myBitmap = getResizedBitmap(myBitmap);
-                                }
-                                imageView.setImageBitmap(myBitmap);
+                                Bitmap photoBitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
+                                checkQuality(imgFile, photoBitmap);
+                                photoBitmap = getResizeBitmap(photoBitmap);
+                                imageView.setImageBitmap(photoBitmap);
                             });
                         } else {
                             setImageUnloaded();
@@ -183,17 +195,46 @@ public class PhotoDownloader {
         requestQueue.add(downloadHttpService);
     }
 
+    private void checkQuality(File file, Bitmap bitmap) {
+        if (quality != 0) {
+            setImageQuality(file, bitmap);
+        }
+    }
+
+    private Bitmap getResizeBitmap(Bitmap bitmap) {
+        if (width != 0 && height != 0) {
+            return HandlerReturnValue.getResizedBitmap(bitmap, width, height);
+        }
+        return bitmap;
+    }
+
     private void setImageUnloaded() {
         if (imageUnloaded == null) {
             handler.post(() -> {
-                imageView.clearAnimation();
+                if (animation != null) {
+                    imageView.clearAnimation();
+                }
                 imageView.setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_image_broken));
             });
         } else {
             handler.post(() -> {
-                imageView.clearAnimation();
+                if (animation != null) {
+                    imageView.clearAnimation();
+                }
                 imageView.setImageDrawable(imageUnloaded);
             });
+        }
+    }
+
+    private void setAnimation() {
+        animation = AnimationUtils.loadAnimation(context, R.anim.rotate_animaiton_infinite);
+    }
+
+    private void setImageQuality(File file, Bitmap bitmap) {
+        try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, fileOutputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

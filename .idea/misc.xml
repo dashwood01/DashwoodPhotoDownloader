@@ -3,6 +3,8 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/dashwood/Workspace/DashwoodPhotoDownloader/PhotoDownloader/src/main/res/drawable/ic_loading.xml" value="0.20833333333333334" />
+        <entry key="..\:/dashwood/Workspace/DashwoodPhotoDownloader/app/src/main/res/drawable/ic_loading.xml" value="0.20833333333333334" />
         <entry key="PhotoDownloader/src/main/res/drawable/ic_image_broken.xml" value="0.15555555555555556" />
         <entry key="PhotoDownloader/src/main/res/drawable/ic_image_not_download.xml" value="0.15555555555555556" />
         <entry key="app/src/main/res/drawable/ic_loading.xml" value="0.15555555555555556" />

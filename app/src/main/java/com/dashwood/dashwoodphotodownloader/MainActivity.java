@@ -18,9 +18,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
         PhotoDownloader photoDownloader = new PhotoDownloader(getApplicationContext(), "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/ESC_large_ISS022_ISS022-E-11387-edit_01.JPG/1600px-ESC_large_ISS022_ISS022-E-11387-edit_01.JPG"
                 , binding.imgView);
-        photoDownloader.setImageLoading(R.drawable.ic_loading, true);
-        photoDownloader.setClearCache(true);
-        //photoDownloader.setWidthAndHeight(100,100);
         photoDownloader.init();
     }
 }
