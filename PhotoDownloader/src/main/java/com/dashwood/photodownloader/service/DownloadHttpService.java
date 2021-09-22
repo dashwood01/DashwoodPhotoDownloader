@@ -26,8 +26,8 @@ public class DownloadHttpService extends Request<byte[]> {
         mListener = listener;
     }
 
-    public DownloadHttpService setHeader(String key, String value) {
-        headers.put(key, value);
+    public DownloadHttpService setHeader(Map<String, String> header) {
+        headers = header;
         return this;
     }
 

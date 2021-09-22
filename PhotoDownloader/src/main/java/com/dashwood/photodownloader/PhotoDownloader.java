@@ -28,6 +28,8 @@ import com.dashwood.photodownloader.service.HttpsTrustManager;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PhotoDownloader {
     private RequestQueue requestQueue;
@@ -46,6 +48,7 @@ public class PhotoDownloader {
     private Animation animation;
     private CallBackDownloader callBackDownloader;
     private String saveDate;
+    private Map<String, String> headers = new HashMap<>();
 
     /**
      * You must set all this items, be careful all of this items can't be null
@@ -147,6 +150,11 @@ public class PhotoDownloader {
         return this;
     }
 
+    public PhotoDownloader setHeader(String key, String value) {
+        headers.put(key, value);
+        return this;
+    }
+
     public void init() {
         downloadPhoto();
     }
@@ -240,7 +248,7 @@ public class PhotoDownloader {
                 callBackDownloader.onError(new Exception(new String(networkResponse.data)));
             }
             Log.e("Error_DashWood", new String(networkResponse.data));
-        });
+        }).setHeader(headers);
         requestQueue.add(downloadHttpService);
     }
 
