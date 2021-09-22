@@ -15,7 +15,7 @@
 ```
 
 ```gradle
-    	        implementation 'com.github.dashwood01:DashwoodPhotoDownloader:0.3'
+    	        implementation 'com.github.dashwood01:DashwoodPhotoDownloader:0.4'
 ```
 
 ### Use it like this
